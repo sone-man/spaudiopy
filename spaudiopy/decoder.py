@@ -110,10 +110,6 @@ class LoudspeakerSetup:
 
     @property
     def simplices(self):
-        return self._hull.simplices
-
-    @property
-    def simplices(self):
         return sort_vertices(self._hull.simplices)
 
     @property
@@ -755,7 +751,8 @@ def characteristic_ambisonic_order(hull):
     _xp, _yp, _zp = sph.project_on_sphere(_hull.points[:, 0],
                                           _hull.points[:, 1],
                                           _hull.points[:, 2],)
-    _hull.points = np.c_[_xp, _yp, _zp]
+
+    _hull = LoudspeakerSetup(_xp, _yp, _zp)
     # project centroids (for non-uniform setups)
     src = np.asarray(sph.project_on_sphere(hull.centroids[:, 0],
                                            hull.centroids[:, 1],
