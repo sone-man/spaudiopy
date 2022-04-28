@@ -27,7 +27,7 @@ import numpy as np
 import scipy.spatial as scyspat
 from scipy import signal
 
-from spaudiopy import utils, sph, IO, plots, grids
+from . import utils, sph, IO, plots, grids
 
 shared_array = None
 
@@ -74,25 +74,6 @@ class LoudspeakerSetup:
         # amplitude decay exponent
         self.a = 1
 
-        # Triangulation of points
-        self._hull = get_hull(self.x, self.y, self.z)
-        self.points = self._hull.points
-        self.npoints = self._hull.npoints
-        self.nsimplex = self._hull.nsimplex
-        self.vertices = self._hull.vertices
-        self.simplices = self._hull.simplices
-        self.simplices = sort_vertices(self.simplices)
-        self.centroids = calculate_centroids(self)
-        self.face_areas = calculate_face_areas(self)
-        self.face_normals = calculate_face_normals(self)
-        self.vertex_normals = calculate_vertex_normals(self)
-        self.barycenter = calculate_barycenter(self)
-
-        # All simplices enclosing listener valid per default for rendering
-        self._encloses_listener = check_listener_inside(self,
-                                                        self.listener_position)
-        self.valid_simplices = self._encloses_listener
-
         # VBAP
         self.inverted_vbase = None  # populated by VBAP
 
@@ -100,9 +81,69 @@ class LoudspeakerSetup:
         self.ambisonics_hull = []
         self.kernel_hull = []
         self.characteristic_order = None
+        self.__calculated_hull = None
 
-        # some checks
-        assert(len(self.d) == self.npoints)
+        # All simplices enclosing listener valid per default for rendering
+
+    # iangulation of points
+    @property
+    def _hull(self):
+        if not self.__calculated_hull:
+            self.__calculated_hull = get_hull(self.x, self.y, self.z)
+        return  self.__calculated_hull
+
+    @property
+    def points(self):
+        return self._hull.points
+
+    @property
+    def npoints(self):
+        return self._hull.npoints
+
+    @property
+    def nsimplex(self):
+        return self._hull.nsimplex
+
+    @property
+    def vertices(self):
+        return self._hull.vertices
+
+    @property
+    def simplices(self):
+        return self._hull.simplices
+
+    @property
+    def simplices(self):
+        return sort_vertices(self._hull.simplices)
+
+    @property
+    def centroids(self):
+        return calculate_centroids(self)
+
+    @property
+    def face_areas(self):
+        return calculate_face_areas(self)
+
+    @property
+    def face_normals(self):
+        return calculate_face_normals(self)
+
+    @property
+    def vertex_normals(self):
+        return calculate_vertex_normals(self)
+
+    @property
+    def barycenter(self):
+        return calculate_barycenter(self)
+
+    @property
+    def _encloses_listener(self):
+        return check_listener_inside(self, self.listener_position)
+
+    @property
+    def valid_simplices(self):
+        return self._encloses_listener
+
 
     @classmethod
     def from_sph(cls, azi, colat, r=1, listener_position=None):
@@ -1230,7 +1271,7 @@ def sad(F_nm, hull, N_sph=None):
     ls_sig = D @ F_nm[:(N_sph+1)**2, :]
     return ls_sig
 
-def calc_mad_decoding_matrix(F_nm, hull, N_sph):
+def calc_mad_decoding_matrix(n_modes, hull, N_sph):
     """Calculate Mode-Matching Ambisonic Decoding Matrix.
     Parameters
     ----------
@@ -1252,7 +1293,7 @@ def calc_mad_decoding_matrix(F_nm, hull, N_sph):
 
     """
     L = hull.npoints
-    N_sph_in = int(np.sqrt(F_nm.shape[0]) - 1)
+    N_sph_in = int(np.sqrt(n_modes) - 1)
     assert(N_sph_in >= N_sph)  # for now
 
     ls_azi, ls_colat, ls_r = utils.cart2sph(*hull.points.T)
@@ -1341,7 +1382,7 @@ def calc_epad_decoding_matrix(n_modes, hull, N_sph):
         warn('EPAD needs more loudspeakers for this N_sph!'
              f' ({L} < {(N_sph+1)**2})')
 
-    N_sph_in = int(np.sqrt(F_nm.shape[0]) - 1)
+    N_sph_in = int(np.sqrt(n_modes) - 1)
     assert(N_sph_in >= N_sph)  # for now
 
     # SVD of LS base
